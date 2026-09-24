@@ -1,3 +1,5 @@
+import { linkIdentifierFor } from "./guest-identifier";
+
 /**
  * Append the tenant's hotel slug to a /boarding-pass digital-key URL.
  *
@@ -12,4 +14,20 @@ export function appendHotelSlug(boardingPassUrl: string, hotelSlug?: string | nu
   if (!slug) return boardingPassUrl;
   const sep = boardingPassUrl.includes("?") ? "&" : "?";
   return `${boardingPassUrl}${sep}hotel=${encodeURIComponent(slug)}`;
+}
+
+/**
+ * Build the digital-key link for a reservation. Uses the LINK-GRADE identifier
+ * (reservation UUID) so the link cannot be guessed — see shared/guest-identifier.ts.
+ */
+export function buildBoardingPassUrl(
+  baseUrl: string,
+  reservation: { id: string; lastName: string },
+  hotelSlug?: string | null,
+): string {
+  const base = baseUrl.replace(/\/+$/, "");
+  return appendHotelSlug(
+    `${base}/boarding-pass?res=${encodeURIComponent(linkIdentifierFor(reservation))}&name=${encodeURIComponent(reservation.lastName)}`,
+    hotelSlug,
+  );
 }

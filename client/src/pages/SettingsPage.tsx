@@ -73,6 +73,7 @@ export default function SettingsPage() {
     door_code_sms_text: "",
     guest_info_enabled: "false",
     guest_info_domain: "",
+    guest_info_token: "",
     guest_info_flights_url: "",
     guest_info_wifi_network: "",
     guest_info_wifi_password: "",
@@ -132,6 +133,7 @@ export default function SettingsPage() {
         door_code_sms_text: getSettingValue("door_code_sms_text") || "",
         guest_info_enabled: getSettingValue("guest_info_enabled") || "false",
         guest_info_domain: getSettingValue("guest_info_domain") || "",
+        guest_info_token: getSettingValue("guest_info_token") || "",
         guest_info_flights_url: getSettingValue("guest_info_flights_url") || "",
         guest_info_wifi_network: getSettingValue("guest_info_wifi_network") || "",
         guest_info_wifi_password: getSettingValue("guest_info_wifi_password") || "",
@@ -187,6 +189,7 @@ export default function SettingsPage() {
       { key: "door_code_sms_text", value: formValues.door_code_sms_text },
       { key: "guest_info_enabled", value: formValues.guest_info_enabled },
       { key: "guest_info_domain", value: formValues.guest_info_domain },
+      { key: "guest_info_token", value: formValues.guest_info_token },
       { key: "guest_info_flights_url", value: formValues.guest_info_flights_url },
       { key: "guest_info_wifi_network", value: formValues.guest_info_wifi_network },
       { key: "guest_info_wifi_password", value: formValues.guest_info_wifi_password },
@@ -1003,6 +1006,31 @@ export default function SettingsPage() {
               <p className="text-[0.8rem] text-muted-foreground">
                 When this domain points at the app (custom domain in Railway + DNS CNAME), its front page
                 redirects straight to the info screen — the tablet only needs the bare domain.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="guest-info-token">Kiosk token (recommended)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="guest-info-token"
+                  value={formValues.guest_info_token}
+                  onChange={(e) => setFormValues({ ...formValues, guest_info_token: e.target.value })}
+                  placeholder="empty = domain check only"
+                  data-testid="input-guest-info-token"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setFormValues({ ...formValues, guest_info_token: crypto.randomUUID().replace(/-/g, "") })}
+                  data-testid="button-generate-guest-info-token"
+                >
+                  Generate
+                </Button>
+              </div>
+              <p className="text-[0.8rem] text-muted-foreground">
+                When set, the door-code lookup only answers requests that carry this token. Open the info screen once on the
+                tablet as <code>/&lt;slug&gt;/info?k=&lt;token&gt;</code> — it remembers the token, so later visits and the
+                bare-domain redirect keep working. To rotate, generate a new one, save, and open that link on the tablet again.
               </p>
             </div>
             <div className="grid gap-2">

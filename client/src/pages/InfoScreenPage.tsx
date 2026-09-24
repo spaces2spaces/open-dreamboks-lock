@@ -396,6 +396,22 @@ export default function InfoScreenPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [result, setResult] = useState<DoorCodeResponse | null>(null);
+  // Kiosk token (setting guest_info_token): arrives once as ?k=… on the
+  // tablet's URL and is remembered locally, so the bare-domain redirect and
+  // later reloads keep working without the parameter.
+  const [kioskToken] = useState<string | null>(() => {
+    try {
+      const key = `kioskToken:${params.hotel ?? ""}`;
+      const fromUrl = new URLSearchParams(window.location.search).get("k");
+      if (fromUrl) {
+        localStorage.setItem(key, fromUrl);
+        return fromUrl;
+      }
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  });
 
   const resetLookup = useCallback(() => {
     setLastName("");
@@ -574,6 +590,7 @@ export default function InfoScreenPage() {
           hotelSlug: params.hotel,
           query: queryTrim,
           reservationNumber: resNumber.trim() || undefined,
+          kioskToken: kioskToken || undefined,
         }),
       });
       const data: DoorCodeResponse = await response.json();

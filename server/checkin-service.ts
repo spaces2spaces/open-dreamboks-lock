@@ -1,5 +1,5 @@
 import { IStorage } from "./storage";
-import { appendHotelSlug } from "@shared/boarding-pass-url";
+import { appendHotelSlug, buildBoardingPassUrl } from "@shared/boarding-pass-url";
 import { MewsClient } from "./mews-client";
 import { AutomationEngine } from "./automation";
 import { NotificationClient, createNotificationClient } from "./notification-client";
@@ -572,8 +572,7 @@ export class CheckInService {
             const hotelNameSetting = await this.storage.getSetting("hotel_name");
             const hotelNameVal = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
             const hotelSlug = (await this.storage.getSetting("hotel_slug"))?.value;
-            const resIdentifier = freshReservation.extId || freshReservation.confirmationCode || "";
-            const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(freshReservation.lastName)}`, hotelSlug);
+            const boardingPassUrl = buildBoardingPassUrl(baseUrl, freshReservation, hotelSlug);
 
             smsResult = await notifClient.sendBoardingPassSMS({
               mobile: recipientMobile!,
@@ -700,6 +699,7 @@ export class CheckInService {
         email: recipientEmail,
         guestName: `${reservation.firstName} ${reservation.lastName}`,
         reservationNumber: reservation.extId || reservation.confirmationCode || String(reservation.id),
+        reservationId: reservation.id,
         lastName: reservation.lastName,
         arrivalDate: new Date(reservation.arrival).toLocaleDateString("en-GB", {
           weekday: "long",

@@ -652,6 +652,8 @@ Click here: ${params.checkInUrl}`;
     email: string;
     guestName: string;
     reservationNumber: string;
+    /** Reservation UUID — the link-grade identifier used in the digital-key link (see shared/guest-identifier.ts). */
+    reservationId?: string;
     lastName: string;
     arrivalDate: string;
     departureDate: string;
@@ -670,7 +672,7 @@ Click here: ${params.checkInUrl}`;
       // Build direct link with reservation number and last name as URL params.
       // Append the tenant slug so non-default tenants resolve correctly.
       const boardingPassUrl = appendHotelSlug(
-        `${params.baseUrl}/boarding-pass?res=${encodeURIComponent(params.reservationNumber)}&name=${encodeURIComponent(params.lastName)}`,
+        `${params.baseUrl}/boarding-pass?res=${encodeURIComponent(params.reservationId ?? params.reservationNumber)}&name=${encodeURIComponent(params.lastName)}`,
         params.hotelSlug,
       );
 

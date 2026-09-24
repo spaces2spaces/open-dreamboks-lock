@@ -262,3 +262,15 @@ export const arrivalsLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many requests. Please wait a moment." },
 });
+
+// PIN check-in lookup: a 4-digit door code has only 9,000 valid values, so the
+// per-IP budget is deliberately tight. One real guest types their code once or
+// twice; a reception iPad serving arrivals stays well inside 30 per 15 min.
+// Enumeration is additionally counted by guest-access-guard.ts (tenant alert).
+export const pinLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please wait a few minutes or contact reception." },
+});

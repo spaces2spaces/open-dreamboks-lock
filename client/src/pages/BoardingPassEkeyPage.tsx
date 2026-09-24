@@ -551,7 +551,8 @@ export default function BoardingPassEkeyPage() {
         const response = await fetch("/api/public/unlock", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reservationNumber, lastName, lockId: lock.id, hotelSlug }),
+          // The door code is sent along: a typed booking number alone is not enough to unlock remotely.
+          body: JSON.stringify({ reservationNumber, lastName, lockId: lock.id, hotelSlug, pin: boardingPass?.pin?.code }),
           signal: controller.signal,
         });
         clearTimeout(timeout);

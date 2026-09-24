@@ -14,7 +14,7 @@
 
 import { ITenantStorage, TenantlessReservationInput } from "./storage";
 import { renderDoorCodeTemplate } from "@shared/door-code-template";
-import { appendHotelSlug } from "@shared/boarding-pass-url";
+import { appendHotelSlug, buildBoardingPassUrl } from "@shared/boarding-pass-url";
 import { AutomationEngine } from "./automation";
 import { MewsClient } from "./mews-client";
 import { createNotificationClient } from "./notification-client";
@@ -357,7 +357,7 @@ export class ReservationStateMachine {
       const timezone = timezoneSetting?.value || "Europe/Copenhagen";
 
       const resIdentifier = reservation.extId || reservation.confirmationCode;
-      const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier!)}&name=${encodeURIComponent(reservation.lastName)}`, hotelSlug);
+      const boardingPassUrl = buildBoardingPassUrl(baseUrl, reservation, hotelSlug);
 
       const arrivalDate = DateTime.fromJSDate(new Date(reservation.arrival), { zone: "utc" })
         .setZone(timezone)
@@ -378,6 +378,7 @@ export class ReservationStateMachine {
           email: guestEmail,
           guestName,
           reservationNumber: resIdentifier!,
+          reservationId: reservation.id,
           lastName: reservation.lastName,
           arrivalDate,
           departureDate,

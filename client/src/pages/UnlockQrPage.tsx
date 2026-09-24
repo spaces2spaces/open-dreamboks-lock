@@ -29,16 +29,16 @@ export default function UnlockQrPage() {
       return;
     }
 
-    performUnlock(reservationNumber, lastName, lockId);
+    performUnlock(reservationNumber, lastName, lockId, params.get("p") || undefined);
   }, [searchString]);
 
-  const performUnlock = async (reservationNumber: string, lastName: string, lockId: string) => {
+  const performUnlock = async (reservationNumber: string, lastName: string, lockId: string, pin?: string) => {
     console.log("[UnlockQrPage] Performing unlock:", { reservationNumber, lastName, lockId });
     try {
       const response = await fetch("/api/public/unlock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reservationNumber, lastName, lockId }),
+        body: JSON.stringify({ reservationNumber, lastName, lockId, pin }),
       });
 
       console.log("[UnlockQrPage] Response status:", response.status);

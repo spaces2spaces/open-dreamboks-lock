@@ -1,6 +1,6 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import type { RouteContext } from "./index";
-import { getTenantStorage, publicLimiter, findReservationLimiter, kioskLookupLimiter, earlyCheckinStatusLimiter, validate } from "./middleware";
+import { getTenantStorage, publicLimiter, findReservationLimiter, kioskLookupLimiter, earlyCheckinStatusLimiter, pinLookupLimiter, validate } from "./middleware";
 import {
   quoteEarlyCheckin,
   startEarlyCheckinPayment,
@@ -24,7 +24,9 @@ import { MewsAdapter } from "../mews-adapter";
 import { createIngestionProcessor } from "../ingestion-processor";
 import { createOwnerClient } from "../ttlock-client";
 import { getSpaceDisplayName } from "@shared/display-name";
-import { appendHotelSlug } from "@shared/boarding-pass-url";
+import { appendHotelSlug, buildBoardingPassUrl } from "@shared/boarding-pass-url";
+import { isLinkGradeIdentifier } from "@shared/guest-identifier";
+import { guestAccessGuard } from "../guest-access-guard";
 import { buildGuestFlowTheme } from "../boarding-theme";
 import { buildGuestInfoResponse, buildDoorCodeResult, isSameGuest } from "../guest-info";
 import { rankKioskMatches, matchesBookingNumber } from "../kiosk-lookup-match";
@@ -37,6 +39,12 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
   // `hotelSlug` in the request body; we match that against each tenant's `hotel_slug`
   // setting so non-default tenants' guests reach the right tenant. Falls back to the
   // header/default behaviour when no (or unknown) slug is supplied.
+  function safeEqual(a: string, b: string): boolean {
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
+  }
+
   async function getPublicTenantStorage(req: { body?: any; headers: any }): Promise<ITenantStorage> {
     const rawSlug = typeof req.body?.hotelSlug === "string" ? req.body.hotelSlug.trim() : "";
     if (rawSlug) {
@@ -56,6 +64,40 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
   }
 
   // Public API - Look up Digital Key / Boarding Pass
+  // ── Guest lookup guard ────────────────────────────────────────────────────
+  // Every number+name lookup goes through one of these: refused while the
+  // identifier is locked, failures recorded (per-reservation lockout + tenant
+  // brute-force alert), successes clear the streak.
+  // See server/guest-access-guard.ts and shared/guest-identifier.ts.
+  const LOCKED_MESSAGE = "Too many failed attempts for this reservation. Please try again later or contact reception.";
+  function respondLocked(res: Response) {
+    return res.status(429).json({ error: LOCKED_MESSAGE });
+  }
+  async function guardedByNumber(req: Request, storage: ITenantStorage, reservationNumber: string, lastName: string) {
+    const n = String(reservationNumber).trim();
+    const l = String(lastName).trim();
+    if (guestAccessGuard.lockedFor(storage.tenantId, n) > 0) return { locked: true as const, result: null };
+    const result = await storage.getReservationByNumberAndName(n, l);
+    if (!result) {
+      await guestAccessGuard.recordFailure(storage.tenantId, n, req.ip, storage);
+      return { locked: false as const, result: null };
+    }
+    guestAccessGuard.recordSuccess(storage.tenantId, n);
+    return { locked: false as const, result };
+  }
+  async function guardedWithLocks(req: Request, storage: ITenantStorage, reservationNumber: string, lastName: string) {
+    const n = String(reservationNumber).trim();
+    const l = String(lastName).trim();
+    if (guestAccessGuard.lockedFor(storage.tenantId, n) > 0) return { locked: true as const, result: null };
+    const result = await storage.getReservationWithLocks(n, l);
+    if (!result) {
+      await guestAccessGuard.recordFailure(storage.tenantId, n, req.ip, storage);
+      return { locked: false as const, result: null };
+    }
+    guestAccessGuard.recordSuccess(storage.tenantId, n);
+    return { locked: false as const, result };
+  }
+
   app.post("/api/public/boarding-pass", publicLimiter, validate(boardingPassLookupSchema), async (req, res) => {
     try {
       const storage = await getPublicTenantStorage(req);
@@ -65,10 +107,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number and last name are required" });
       }
 
-      const result = await storage.getReservationByNumberAndName(
-        reservationNumber.trim(),
-        lastName.trim()
-      );
+      const { locked, result } = await guardedByNumber(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
 
       if (!result) {
         return res.status(404).json({ error: "Reservation not found. Please check your reservation number and last name." });
@@ -119,10 +159,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number and last name are required" });
       }
 
-      const result = await storage.getReservationByNumberAndName(
-        reservationNumber.trim(),
-        lastName.trim()
-      );
+      const { locked, result } = await guardedByNumber(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
 
       if (!result) {
         return res.status(404).json({ error: "Reservation not found" });
@@ -177,10 +215,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number and last name are required" });
       }
 
-      const result = await storage.getReservationByNumberAndName(
-        reservationNumber.trim(),
-        lastName.trim()
-      );
+      const { locked, result } = await guardedByNumber(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
 
       if (!result) {
         return res.status(404).json({ error: "Reservation not found" });
@@ -240,10 +276,12 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
 
       // Run the reservation lookup and settings fetch in parallel (independent) —
       // one query for all settings instead of ~9 sequential getSetting round-trips.
-      const [result, allSettings] = await Promise.all([
-        storage.getReservationWithLocks(reservationNumber.trim(), lastName.trim()),
+      const [lookup, allSettings] = await Promise.all([
+        guardedWithLocks(req, storage, reservationNumber, lastName),
         storage.getAllSettings(),
       ]);
+      if (lookup.locked) return respondLocked(res);
+      const result = lookup.result;
 
       if (!result) {
         return res.status(404).json({ error: "Reservation not found. Please check your reservation number and last name." });
@@ -293,10 +331,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
           const activationResult = await automationEngine.getPinLifecycle().activatePendingForReservation(result.reservation.id);
           if (activationResult.success || activationResult.alreadyActive) {
             // Re-fetch updated pin + locks
-            const refreshed = await storage.getReservationWithLocks(
-              (result.reservation.confirmationCode || result.reservation.extId)!,
-              result.reservation.lastName
-            );
+            const refreshed = await storage.getReservationWithLocks(result.reservation.id, result.reservation.lastName);
             if (refreshed) {
               result.pin = refreshed.pin;
               result.locks = refreshed.locks;
@@ -385,10 +420,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number and last name are required" });
       }
 
-      const result = await storage.getReservationWithLocks(
-        reservationNumber.trim(),
-        lastName.trim()
-      );
+      const { locked, result } = await guardedWithLocks(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
 
       if (!result) {
         return res.status(404).json({ error: "Reservation not found" });
@@ -415,7 +448,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
 
       // Re-fetch from DB (post-ingestion) and settings in parallel (independent).
       const [refreshed, allSettings] = await Promise.all([
-        storage.getReservationWithLocks(reservationNumber.trim(), lastName.trim()),
+        storage.getReservationWithLocks(result.reservation.id, result.reservation.lastName),
         storage.getAllSettings(),
       ]);
       if (!refreshed) {
@@ -460,10 +493,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
           const automationEngine = ctx.getAutomationEngine(refreshed.reservation.tenantId || DEFAULT_TENANT_ID);
           const activationResult = await automationEngine.getPinLifecycle().activatePendingForReservation(refreshed.reservation.id);
           if (activationResult.success || activationResult.alreadyActive) {
-            const reActivated = await storage.getReservationWithLocks(
-              reservationNumber.trim(),
-              lastName.trim()
-            );
+            const reActivated = await storage.getReservationWithLocks(refreshed.reservation.id, refreshed.reservation.lastName);
             if (reActivated) {
               refreshed.pin = reActivated.pin;
               refreshed.locks = reActivated.locks;
@@ -549,7 +579,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number and last name are required" });
       }
 
-      const result = await storage.getReservationWithLocks(reservationNumber.trim(), lastName.trim());
+      const { locked, result } = await guardedWithLocks(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
       if (!result) {
         return res.status(404).json({ error: "Reservation not found" });
       }
@@ -612,10 +643,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number, last name, and lock ID are required" });
       }
 
-      const result = await storage.getReservationWithLocks(
-        reservationNumber.trim(),
-        lastName.trim()
-      );
+      const { locked, result } = await guardedWithLocks(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
 
       if (!result) {
         return res.status(404).json({ error: "Reservation not found" });
@@ -694,7 +723,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
     console.log("[Unlock API] Request received:", { body: req.body });
     try {
       const storage = await getPublicTenantStorage(req);
-      const { reservationNumber, lastName, lockId } = req.body;
+      const { reservationNumber, lastName, lockId, pin } = req.body;
 
       console.log("[Unlock API] Params:", { reservationNumber, lastName, lockId });
 
@@ -703,16 +732,26 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Reservation number, last name, and lock ID are required" });
       }
 
-      const result = await storage.getReservationWithLocks(
-        reservationNumber.trim(),
-        lastName.trim()
-      );
+      const { locked, result } = await guardedWithLocks(req, storage, reservationNumber, lastName);
+      if (locked) return respondLocked(res);
 
       if (!result) {
         console.log("[Unlock API] Reservation not found for:", { reservationNumber, lastName });
         return res.status(404).json({ error: "Reservation not found" });
       }
 
+      // Form-grade identifier (a typed booking number): remote unlock also
+      // demands the guest's door code — the same secret that opens the door at
+      // the keypad. A link-grade identifier (UUID from a link we sent) needs
+      // nothing more; it cannot be guessed.
+      if (!isLinkGradeIdentifier(String(reservationNumber))) {
+        const expected = result.pin?.code;
+        const supplied = typeof pin === "string" ? pin.trim() : "";
+        if (!expected || !supplied || !safeEqual(supplied, expected)) {
+          await guestAccessGuard.recordFailure(storage.tenantId, String(reservationNumber).trim(), req.ip, storage);
+          return res.status(403).json({ error: "Enter the door code from your confirmation to unlock remotely." });
+        }
+      }
       console.log("[Unlock API] Found reservation:", result.reservation.id, "with locks:", result.locks.map(l => ({ id: l.id, name: l.name })));
 
       const lock = result.locks.find(l => l.id === lockId);
@@ -1059,10 +1098,26 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       // Host header is the gate — a phone on any other domain is refused.
       // Tenants without a kiosk domain are unaffected; localhost stays open
       // for development.
-      const kioskDomain = (await Storage.forTenant(matchedTenantId).getSetting("guest_info_domain"))?.value?.trim().toLowerCase();
-      const reqHost = (req.hostname || "").toLowerCase();
-      if (kioskDomain && reqHost !== kioskDomain && reqHost !== "localhost" && !reqHost.startsWith("127.")) {
-        return res.status(403).json({ error: "The door-code lookup is only available on the hotel's info screen." });
+      // Kiosk gate. Preferred: a per-tenant kiosk token (setting
+      // guest_info_token) that only the wall tablet carries — it arrives once
+      // as ?k= on the tablet's URL and is remembered in the tablet's
+      // localStorage. A request header is not a secret; a token is.
+      // Fallback when no token is configured: the Host-header check below.
+      const kioskSettings = Storage.forTenant(matchedTenantId);
+      const kioskToken = (await kioskSettings.getSetting("guest_info_token"))?.value?.trim();
+      const kioskDenied = { error: "The door-code lookup is only available on the hotel's info screen." };
+      if (kioskToken) {
+        const supplied = typeof req.body?.kioskToken === "string" ? req.body.kioskToken.trim() : "";
+        if (!supplied || !safeEqual(supplied, kioskToken)) {
+          await guestAccessGuard.recordProbe(matchedTenantId, req.ip, kioskSettings);
+          return res.status(403).json(kioskDenied);
+        }
+      } else {
+        const kioskDomain = (await kioskSettings.getSetting("guest_info_domain"))?.value?.trim().toLowerCase();
+        const reqHost = (req.hostname || "").toLowerCase();
+        if (kioskDomain && reqHost !== kioskDomain && reqHost !== "localhost" && !reqHost.startsWith("127.")) {
+          return res.status(403).json(kioskDenied);
+        }
       }
 
       const tenantStorage = Storage.forTenant(matchedTenantId);
@@ -1110,6 +1165,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       }
 
       if (filtered.length === 0) {
+        await guestAccessGuard.recordProbe(matchedTenantId, req.ip, tenantStorage);
         return res.status(404).json({
           found: false,
           error: resNumTrim.length > 0
@@ -1128,10 +1184,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
 
       const results = [];
       for (const match of filtered) {
-        const matchNumber = match.confirmationCode || match.extId;
-        if (!matchNumber) continue;
-
-        const result = await tenantStorage.getReservationWithLocks(matchNumber, match.lastName);
+        const result = await tenantStorage.getReservationWithLocks(match.id, match.lastName);
         if (!result) continue;
 
         results.push(buildDoorCodeResult(result.reservation, result.pin, get));
@@ -1383,7 +1436,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
   });
 
   // Public API - Lookup Reservation by PIN
-  app.post("/api/public/lookup-by-pin", publicLimiter, async (req, res) => {
+  app.post("/api/public/lookup-by-pin", pinLookupLimiter, async (req, res) => {
     try {
       const { pin, hotelSlug } = req.body;
 
@@ -1432,6 +1485,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       );
 
       if (candidates.length === 0) {
+        await guestAccessGuard.recordProbe(storage.tenantId, req.ip, storage);
         return res.status(404).json({ error: "No reservation found with this code" });
       }
 
@@ -1463,25 +1517,19 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         || !!reservation.paymentVerifiedAt
         || (reservation.owing !== null && reservation.owing !== undefined && parseFloat(reservation.owing) <= 0);
 
+      // Only what the PIN check-in page renders. No contact details, no PMS
+      // identifiers: a 4-digit code must never be a key to personal data.
       res.json({
         id: reservation.id,
-        extId: reservation.extId,
         firstName: reservation.firstName,
         lastName: reservation.lastName,
-        email: reservation.email,
-        mobile: reservation.mobile,
         arrival: reservation.arrival,
         departure: reservation.departure,
         room: reservation.room,
-        status: reservation.status,
-        pin: reservation.generatedPin,
-        preCheckinStatus: reservation.preCheckinStatus,
         preCheckinToken: reservation.preCheckinToken,
-        personalEmail: reservation.personalEmail,
         isPaid,
         owing: reservation.owing,
         requireGuestProfile,
-        mewsCustomerId: reservation.mewsCustomerId,
       });
     } catch (error) {
       console.error("Error looking up by PIN:", error);
@@ -1578,9 +1626,8 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
       const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode || "";
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
-      const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(foundReservation.lastName)}`, hotelSlug);
+      const boardingPassUrl = buildBoardingPassUrl(baseUrl, foundReservation, hotelSlug);
 
       const testEmailSetting = await tenantStorage.getSetting("boarding_test_email");
       const recipientEmail = testEmailSetting?.value || personalEmail;
@@ -1589,6 +1636,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         email: recipientEmail,
         guestName: `${foundReservation.firstName} ${foundReservation.lastName}`,
         reservationNumber: foundReservation.extId || foundReservation.confirmationCode || String(foundReservation.id),
+        reservationId: foundReservation.id,
         lastName: foundReservation.lastName,
         arrivalDate: new Date(foundReservation.arrival).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -1686,19 +1734,25 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
         return res.status(400).json({ error: "Invalid email address" });
       }
 
-      // Find the reservation
-      const allTenants = await db.select().from(tenantsTable).where(eq(tenantsTable.active, true));
-      let foundReservation = null;
-      let tenantStorage: ITenantStorage | null = null;
-
-      for (const tenant of allTenants) {
-        const storage = Storage.forTenant(tenant.id);
-        const result = await storage.getReservationByNumberAndName(reservationNumber.trim(), lastName.trim());
-
-        if (result) {
-          foundReservation = result.reservation;
-          tenantStorage = storage;
-          break;
+      // Find the reservation: guarded lookup on the tenant the page named
+      // (hotelSlug; default tenant otherwise). A cross-tenant scan is only
+      // done for a link-grade identifier — it cannot be enumerated.
+      const primary = await getPublicTenantStorage(req);
+      const first = await guardedByNumber(req, primary, reservationNumber, lastName);
+      if (first.locked) return respondLocked(res);
+      let foundReservation = first.result?.reservation ?? null;
+      let tenantStorage: ITenantStorage | null = first.result ? primary : null;
+      if (!foundReservation && isLinkGradeIdentifier(String(reservationNumber))) {
+        const allTenants = await db.select().from(tenantsTable).where(eq(tenantsTable.active, true));
+        for (const tenant of allTenants) {
+          if (tenant.id === primary.tenantId) continue;
+          const storage = Storage.forTenant(tenant.id);
+          const result = await storage.getReservationByNumberAndName(String(reservationNumber).trim(), String(lastName).trim());
+          if (result) {
+            foundReservation = result.reservation;
+            tenantStorage = storage;
+            break;
+          }
         }
       }
 
@@ -1715,15 +1769,15 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
       const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode || "";
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
-      const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(foundReservation.lastName)}`, hotelSlug);
+      const boardingPassUrl = buildBoardingPassUrl(baseUrl, foundReservation, hotelSlug);
 
       const emailResult = await notificationClient.sendBoardingPassEmail({
         email,
         accessCode: foundReservation.generatedPin,
         guestName: `${foundReservation.firstName} ${foundReservation.lastName}`,
         reservationNumber: foundReservation.extId || foundReservation.confirmationCode || String(foundReservation.id),
+        reservationId: foundReservation.id,
         lastName: foundReservation.lastName,
         arrivalDate: new Date(foundReservation.arrival).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -1843,15 +1897,15 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
       const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode || "";
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
-      const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(foundReservation.lastName)}`, hotelSlug);
+      const boardingPassUrl = buildBoardingPassUrl(baseUrl, foundReservation, hotelSlug);
 
       const emailResult = await notificationClient.sendBoardingPassEmail({
         email: foundReservation.personalEmail,
         accessCode: foundReservation.generatedPin,
         guestName: `${foundReservation.firstName} ${foundReservation.lastName}`,
         reservationNumber: foundReservation.extId || foundReservation.confirmationCode || String(foundReservation.id),
+        reservationId: foundReservation.id,
         lastName: foundReservation.lastName,
         arrivalDate: new Date(foundReservation.arrival).toLocaleDateString("en-GB", {
           weekday: "long",

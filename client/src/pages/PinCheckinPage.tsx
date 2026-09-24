@@ -10,25 +10,19 @@ import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { type GuestTheme, guestThemeStyle, useGuestFont, useFavicon } from "@/lib/guest-theme";
 
+// Exactly what /api/public/lookup-by-pin returns — deliberately no contact
+// details or PMS identifiers (see the endpoint).
 interface ReservationData {
   id: string;
-  extId: string | null;
   firstName: string;
   lastName: string;
-  email: string | null;
-  mobile: string | null;
   arrival: string;
   departure: string;
   room: string | null;
-  status: string;
-  pin: string;
-  preCheckinStatus: string;
   preCheckinToken: string | null;
-  personalEmail: string | null;
   isPaid: boolean;
   owing: string | null;
   requireGuestProfile?: boolean;
-  mewsCustomerId?: string | null;
 }
 
 interface HotelInfo {
@@ -220,7 +214,7 @@ export default function PinCheckinPage() {
   };
 
   const boardingPassUrl = (r: ReservationData) =>
-    `${window.location.origin}/boarding-pass?res=${encodeURIComponent(r.extId || r.id)}&name=${encodeURIComponent(r.lastName)}${params.hotel ? `&hotel=${encodeURIComponent(params.hotel)}` : ""}`;
+    `${window.location.origin}/boarding-pass?res=${encodeURIComponent(r.id)}&name=${encodeURIComponent(r.lastName)}${params.hotel ? `&hotel=${encodeURIComponent(params.hotel)}` : ""}`;
 
   /**
    * Where a valid code leads depends on whose screen this is.
@@ -260,7 +254,8 @@ export default function PinCheckinPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reservationNumber: reservation.extId || reservation.id,
+          reservationNumber: reservation.id,
+          hotelSlug: params.hotel,
           lastName: reservation.lastName,
           email: emailToSend,
         }),

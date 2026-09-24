@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import type { RouteContext } from "./index";
 import { getTenantStorage, getTenantStorageAsync, verifyHotelToken, publicLimiter, resolveTenantId } from "./middleware";
 import { CheckInService } from "../checkin-service";
-import { appendHotelSlug } from "@shared/boarding-pass-url";
+import { appendHotelSlug, buildBoardingPassUrl } from "@shared/boarding-pass-url";
 import { NotificationClient, buildEmailBrand } from "../notification-client";
 import { MewsClient } from "../mews-client";
 import { AutomationEngine } from "../automation";
@@ -965,7 +965,7 @@ export function registerCheckinRoutes(app: Express, ctx: RouteContext) {
       const appBaseUrl = appBaseUrlSetting?.value || "https://lock.dreamboks.net";
 
       const resIdentifier = reservation.extId || reservation.confirmationCode;
-      const boardingPassUrl = appendHotelSlug(`${appBaseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier!)}&name=${encodeURIComponent(reservation.lastName)}`, hotelSlugSetting?.value);
+      const boardingPassUrl = buildBoardingPassUrl(appBaseUrl, reservation, hotelSlugSetting?.value);
 
       const twilioAccountSid = await storage.getSetting("twilio_account_sid");
       const twilioAuthToken = await storage.getSetting("twilio_auth_token");
@@ -1003,6 +1003,7 @@ export function registerCheckinRoutes(app: Express, ctx: RouteContext) {
           email: recipientEmail,
           guestName: `${reservation.firstName} ${reservation.lastName}`,
           reservationNumber: resIdentifier!,
+          reservationId: reservation.id,
           lastName: reservation.lastName,
           arrivalDate,
           departureDate,

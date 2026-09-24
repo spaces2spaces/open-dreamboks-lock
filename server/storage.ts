@@ -56,6 +56,7 @@ import {
 import { db } from "./db";
 import { hasActiveLateCheckout } from "./pin-validity-window";
 import { spacesOutsideRoomScopedLock } from "@shared/room-scoped-locks";
+import { isLinkGradeIdentifier } from "@shared/guest-identifier";
 export { db };
 import { eq, desc, and, gte, gt, lt, inArray, isNotNull, or, sql, count, not } from "drizzle-orm";
 import { DateTime } from "luxon";
@@ -525,7 +526,10 @@ export class TenantStorage implements ITenantStorage {
           or(
             eq(reservations.extId, reservationNumber),
             eq(reservations.confirmationCode, reservationNumber),
-            eq(reservations.pmsId, reservationNumber)
+            eq(reservations.pmsId, reservationNumber),
+            // Link-grade identifier (reservation UUID) from a link we sent —
+            // see shared/guest-identifier.ts. Only tried when UUID-shaped.
+            ...(isLinkGradeIdentifier(reservationNumber) ? [eq(reservations.id, reservationNumber)] : [])
           ),
           sql`LOWER(${reservations.lastName}) = LOWER(${lastName})`
         )
