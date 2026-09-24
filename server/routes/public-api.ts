@@ -1578,7 +1578,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
       const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode;
+      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode || "";
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
       const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(foundReservation.lastName)}`, hotelSlug);
 
@@ -1715,7 +1715,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
       const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode;
+      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode || "";
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
       const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(foundReservation.lastName)}`, hotelSlug);
 
@@ -1843,7 +1843,7 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
       const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
       const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode;
+      const resIdentifier = foundReservation.extId || foundReservation.confirmationCode || "";
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
       const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(foundReservation.lastName)}`, hotelSlug);
 

@@ -27,7 +27,7 @@ export default function ReservationsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const { data: reservations = [], isLoading } = useQuery({
+  const { data: reservations = [], isLoading } = useQuery<Reservation[]>({
     queryKey: ["reservations", "active"],
     queryFn: () => fetchAPI("/reservations?filter=active"),
   });
@@ -38,7 +38,7 @@ export default function ReservationsPage() {
 
   const generatePasscodeMutation = useMutation({
     mutationFn: (reservationId: string) =>
-      fetchAPI(`/automation/generate-passcode/${reservationId}`, { method: 'POST' }),
+      fetchAPI<{ passcode: string }>(`/automation/generate-passcode/${reservationId}`, { method: 'POST' }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["reservations"] });
       toast({

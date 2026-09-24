@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery } from "@tanstack/react-query";
+import type { Log } from "@shared/schema";
 import { fetchAPI } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
 export default function LogsPage() {
-  const { data: logs = [], isLoading, isError } = useQuery({
+  const { data: logs = [], isLoading, isError } = useQuery<Log[]>({
     queryKey: ["logs"],
     queryFn: () => fetchAPI("/logs?limit=100"),
     refetchInterval: 10000,

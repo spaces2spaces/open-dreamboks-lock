@@ -75,6 +75,7 @@ export interface Reservation {
   requestedCategory?: string | null;
   spaceCategory?: string | null;
   assignedSpace?: string | null;
+  roomLabel?: string | null; // door name of the mapped lock, joined in by GET /api/reservations
   rateName?: string | null;
   avgRate?: string | null;
   totalAmount?: string | null;

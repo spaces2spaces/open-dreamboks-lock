@@ -572,7 +572,7 @@ export class CheckInService {
             const hotelNameSetting = await this.storage.getSetting("hotel_name");
             const hotelNameVal = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
             const hotelSlug = (await this.storage.getSetting("hotel_slug"))?.value;
-            const resIdentifier = freshReservation.extId || freshReservation.confirmationCode;
+            const resIdentifier = freshReservation.extId || freshReservation.confirmationCode || "";
             const boardingPassUrl = appendHotelSlug(`${baseUrl}/boarding-pass?res=${encodeURIComponent(resIdentifier)}&name=${encodeURIComponent(freshReservation.lastName)}`, hotelSlug);
 
             smsResult = await notifClient.sendBoardingPassSMS({
