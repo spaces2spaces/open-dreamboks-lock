@@ -71,3 +71,41 @@ npm run db:push    # drizzle-kit push — CAUTION: check drift first (see below)
 ```
 - **db:push drift status (2026-08):** remaining drift is 5 harmless FK-constraint renames on `early_checkins`/`hourly_bookings`. `cancellation_audit` IS in `shared/schema.ts` (no DROP danger). Always review the plan before confirming a push against prod.
 - DB pool: was silently capped at default 10 — pool sizing and the `logs` timestamp index matter for performance (login 4.9s→0.25s fix).
+
+## Public guest endpoints — security model
+
+All routes under `/api/public/*` are unauthenticated by design (guests have
+no account). They are built to withstand a reader who has this source.
+
+**Identifier grades** — `shared/guest-identifier.ts`. `isLinkGradeIdentifier()`
+is true only for the reservation UUID. `buildBoardingPassUrl()` in
+`shared/boarding-pass-url.ts` is the single builder for digital-key links and
+always uses it; `notification-client.sendBoardingPassEmail` takes
+`reservationId` for the link and keeps `reservationNumber` for display.
+`storage.getReservationByNumberAndName()` accepts the UUID in addition to the
+PMS number / confirmation code / PMS id.
+
+**Guard** — `server/guest-access-guard.ts`, wired through `guardedByNumber()` /
+`guardedWithLocks()` in `server/routes/public-api.ts`. Every number+name lookup
+must go through one of them; a direct `storage.getReservation…(reservationNumber…)`
+call in a public route is a bug. Lockout is per (tenant, identifier); alerts go
+through `sendOpsAlert` with key `public-lookup-bruteforce` and a bucketed
+message so the hourly dedupe holds. State is per process.
+
+**Remote unlock** (`POST /api/public/unlock`): form-grade identifier ⇒ `pin`
+must equal the reservation's active code (constant-time compare). Wrong or
+missing code counts as a failure for that identifier.
+
+**Kiosk** (`POST /api/public/kiosk-door-code`): setting `guest_info_token`
+(constant-time compare against body `kioskToken`) — the tablet gets it via
+`?k=` and keeps it in localStorage under `kioskToken:<slug>`. No token ⇒ the
+older Host-header check against `guest_info_domain`. Misses count as probes.
+
+**PIN check-in** (`POST /api/public/lookup-by-pin`): `pinLookupLimiter`
+(30 / 15 min / IP); response is the minimal shape typed in
+`client/src/pages/PinCheckinPage.tsx`. Misses count as probes.
+
+**Deployment identity** — `server/config.ts`: `appBaseUrl`, `defaultHotelName`,
+`guestEmailFallbackDomain` from env. No file under `server/` may name a
+specific hotel or domain as a fallback; tests assert on `*.example.com`
+values set in `vitest.config.ts`.

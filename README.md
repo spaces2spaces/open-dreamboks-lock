@@ -77,6 +77,52 @@ npm test                  # Vitest
 npm run build && npm start
 ```
 
+## Configuration
+
+Three environment variables describe *this* deployment (see `.env.example`):
+
+| Variable | Used for |
+|---|---|
+| `APP_BASE_URL` | guest links when a tenant has no `app_base_url` setting; the host is also the shared default domain for marketing short links |
+| `DEFAULT_HOTEL_NAME` | guest messages when a tenant has no `hotel_name` setting |
+| `GUEST_EMAIL_FALLBACK_DOMAIN` | placeholder guest e-mails handed to the PMS when a guest has none — a domain **you** control |
+
+Everything else is a per-tenant setting managed in the Settings UI.
+
+## Public endpoint security model
+
+The guest-facing API (`/api/public/*`) is reachable without a login, so it
+is designed to hold up when the code is public — which it is.
+
+- **Two grades of reservation identifier** (`shared/guest-identifier.ts`).
+  Links the system sends carry the reservation UUID: *link-grade*, cannot
+  be enumerated. A booking number typed into a form is *form-grade*:
+  short or sequential, so everything below applies to it.
+- **Per-reservation lockout** (`server/guest-access-guard.ts`). Five failed
+  lookups of the same form-grade identifier in an hour lock it for an hour,
+  even for a correct name afterwards. Keyed by identifier, not by IP, so a
+  hotel-WiFi NAT is never punished as a whole and one guest's typo never
+  affects another. Link-grade identifiers are never locked.
+- **Brute-force alert.** Failed lookups, door-code probes, kiosk misses and
+  wrong door codes are counted per tenant; 30+ in ten minutes sends a
+  warning to `lock_arrival_report_email`, 100+ a critical alert.
+- **Remote unlock with a typed booking number also requires the door
+  code** — the same secret that opens the door at the keypad. A link-grade
+  identifier needs nothing more.
+- **Kiosk door-code lookup** answers only requests carrying the tenant's
+  kiosk token (`guest_info_token`, Settings → Guest info; open the info
+  screen once as `/<slug>/info?k=<token>` on the tablet). Without a token
+  configured, the request must arrive on the kiosk domain.
+- **PIN check-in lookup** returns only what the page renders — no e-mail,
+  phone or PMS identifiers — behind a 30-per-15-minutes limiter.
+- **Per-IP rate limits** (`server/routes/middleware.ts`) remain the first
+  layer on every public route.
+
+Webhooks: TTLock does not sign its callbacks, so the handler acts only on a
+record that names a lock we own **and** carries a door code that matches a
+live reservation. The MEWS webhook triggers a re-fetch with the tenant's own
+tokens and nothing else.
+
 ## Layout
 
 | Path | What |
