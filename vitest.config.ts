@@ -10,6 +10,10 @@ export default defineConfig({
     env: {
       // Dummy value so db.ts doesn't throw on import — no actual DB connection is made in tests
       DATABASE_URL: process.env.DATABASE_URL || "postgresql://test:test@localhost:5432/test",
+      // Deployment identity for server/config.ts — tests assert on these, never on a real domain.
+      APP_BASE_URL: "https://lock.example.com",
+      DEFAULT_HOTEL_NAME: "Example Hotel",
+      GUEST_EMAIL_FALLBACK_DOMAIN: "guest.example.com",
     },
   },
   resolve: {

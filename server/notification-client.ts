@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+import { config as appConfig } from "./config";
 import { db } from './db';
 import { settings as settingsTable } from '@shared/schema';
 import { appendHotelSlug } from '@shared/boarding-pass-url';
@@ -147,7 +148,7 @@ export async function buildEmailBrand(storage: {
 function resolveAbsoluteLogo(logoUrl: string | undefined, appBaseUrl: string | undefined): string | null {
   if (!logoUrl) return null;
   if (/^https?:\/\//.test(logoUrl)) return logoUrl;
-  const base = (appBaseUrl || "https://lock.dreamboks.net").replace(/\/$/, "");
+  const base = (appBaseUrl || appConfig.appBaseUrl).replace(/\/$/, "");
   return `${base}${logoUrl.startsWith("/") ? "" : "/"}${logoUrl}`;
 }
 

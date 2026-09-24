@@ -18,6 +18,7 @@
  *  - Manual "Send now" (and dryRun/testTo) always works regardless of enabled.
  */
 import { DateTime } from "luxon";
+import { config } from "./config";
 import type { ITenantStorage } from "./storage";
 import type { Reservation } from "@shared/schema";
 import { createNotificationClient } from "./notification-client";
@@ -160,7 +161,7 @@ export async function renderSmsText(storage: ITenantStorage, campaign: Marketing
   const template = override || campaign.defaultSmsText;
   const hotelName = (await storage.getSetting("hotel_name"))?.value || "our hotel";
   const slug = (await storage.getSetting("hotel_slug"))?.value || "";
-  const baseRaw = (await storage.getSetting("app_base_url"))?.value || "https://lock.dreamboks.net";
+  const baseRaw = (await storage.getSetting("app_base_url"))?.value || config.appBaseUrl;
   // Personalized link: the guest already got their door code by SMS (audience
   // requires it), so the code pre-fills the /extras lookup — one tap, no typing.
   const pin = reservation?.generatedPin?.trim();
@@ -171,7 +172,7 @@ export async function renderSmsText(storage: ITenantStorage, campaign: Marketing
   // matches host against app_base_url), so it keeps the long form.
   // ?o=/&offer= (owner 5/8): the page opens ONLY this campaign's offer.
   let ownDomain = false;
-  try { ownDomain = new URL(base).hostname.toLowerCase() !== "lock.dreamboks.net"; } catch { /* malformed base — long form */ }
+  try { ownDomain = new URL(base).hostname.toLowerCase() !== new URL(config.appBaseUrl).hostname.toLowerCase(); } catch { /* malformed base — long form */ }
   const link = pin && ownDomain
     ? `${base}/e/${encodeURIComponent(pin)}?o=${campaign.offer}`
     : `${base}/${slug}/extras?${pin ? `code=${encodeURIComponent(pin)}&` : ""}offer=${campaign.offer}`;
@@ -294,7 +295,7 @@ export async function runCampaign(
     const guestEmail = (r.personalEmail || r.email || "").trim();
     let emailedTo: string | null = null;
     if (!testPhoneOverride && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
-      const hotelName = (await storage.getSetting("hotel_name"))?.value || "Copenhagen Downtown Hostel";
+      const hotelName = (await storage.getSetting("hotel_name"))?.value || config.defaultHotelName;
       const emailResult = await client.sendPlainTextEmail({
         to: guestEmail,
         subject: `${hotelName} — an offer for your stay`,

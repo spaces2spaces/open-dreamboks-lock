@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { config } from "../config";
 import crypto from "crypto";
 import type { RouteContext } from "./index";
 import { verifyAdminToken, getTenantStorage, validate } from "./middleware";
@@ -302,7 +303,7 @@ export function registerAdminRoutes(app: Express, ctx: RouteContext) {
 
           // Get base URL from request origin for proper development/production support
           const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-          const host = req.headers["x-forwarded-host"] || req.headers.host || "lock.dreamboks.net";
+          const host = req.headers["x-forwarded-host"] || req.headers.host || new URL(config.appBaseUrl).host;
           const baseUrl = `${protocol}://${host}`;
           const setupUrl = `${baseUrl}/setup?token=${token}`;
 
@@ -876,8 +877,8 @@ export function registerAdminRoutes(app: Express, ctx: RouteContext) {
       const appBaseUrlSetting = await storage.getSetting("app_base_url");
 
       const hotelSlug = hotelSlugSetting?.value || "downtown";
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const appBaseUrl = appBaseUrlSetting?.value || "https://lock.dreamboks.net";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
+      const appBaseUrl = appBaseUrlSetting?.value || config.appBaseUrl;
 
       const checkInUrl = `${appBaseUrl}/check-in/preview-token-example`;
       const { format } = await import("date-fns");

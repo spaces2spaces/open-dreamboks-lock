@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { config } from "../config";
 import type { RouteContext } from "./index";
 import { getTenantStorage, publicLimiter, findReservationLimiter, kioskLookupLimiter, earlyCheckinStatusLimiter, pinLookupLimiter, validate } from "./middleware";
 import {
@@ -1623,9 +1624,9 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
 
       const notificationClient = await createNotificationClient(tenantStorage);
       const appUrlSetting = await tenantStorage.getSetting("app_base_url");
-      const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
       const boardingPassUrl = buildBoardingPassUrl(baseUrl, foundReservation, hotelSlug);
 
@@ -1766,9 +1767,9 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
 
       const notificationClient = await createNotificationClient(tenantStorage);
       const appUrlSetting = await tenantStorage.getSetting("app_base_url");
-      const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
       const boardingPassUrl = buildBoardingPassUrl(baseUrl, foundReservation, hotelSlug);
 
@@ -1894,9 +1895,9 @@ export function registerPublicApiRoutes(app: Express, ctx: RouteContext) {
 
       const notificationClient = await createNotificationClient(tenantStorage);
       const appUrlSetting = await tenantStorage.getSetting("app_base_url");
-      const baseUrl = appUrlSetting?.value || `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` || "https://dreamboks.com";
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
       const hotelNameSetting = await tenantStorage.getSetting("hotel_name");
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
       const hotelSlug = (await tenantStorage.getSetting("hotel_slug"))?.value;
       const boardingPassUrl = buildBoardingPassUrl(baseUrl, foundReservation, hotelSlug);
 

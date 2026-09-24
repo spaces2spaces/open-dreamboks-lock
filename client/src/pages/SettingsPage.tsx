@@ -1000,7 +1000,7 @@ export default function SettingsPage() {
                 id="guest-info-domain"
                 value={formValues.guest_info_domain}
                 onChange={(e) => setFormValues({ ...formValues, guest_info_domain: e.target.value })}
-                placeholder="infoscreen.hotelcapsuleinn.com"
+                placeholder="infoscreen.example.com"
                 data-testid="input-guest-info-domain"
               />
               <p className="text-[0.8rem] text-muted-foreground">
@@ -1039,7 +1039,7 @@ export default function SettingsPage() {
                 id="guest-info-flights-url"
                 value={formValues.guest_info_flights_url}
                 onChange={(e) => setFormValues({ ...formValues, guest_info_flights_url: e.target.value })}
-                placeholder="https://www.hotelcapsuleinn.com/api/flights"
+                placeholder="https://www.example.com/api/flights"
                 data-testid="input-guest-info-flights-url"
               />
               <p className="text-[0.8rem] text-muted-foreground">

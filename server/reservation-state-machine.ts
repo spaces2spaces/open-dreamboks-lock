@@ -13,6 +13,7 @@
  */
 
 import { ITenantStorage, TenantlessReservationInput } from "./storage";
+import { config } from "./config";
 import { renderDoorCodeTemplate } from "@shared/door-code-template";
 import { appendHotelSlug, buildBoardingPassUrl } from "@shared/boarding-pass-url";
 import { AutomationEngine } from "./automation";
@@ -218,8 +219,8 @@ export class ReservationStateMachine {
       const timezoneSetting = await this.storage.getSetting("property_timezone");
       const timezone = timezoneSetting?.value || "Europe/Copenhagen";
 
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const baseUrl = appUrlSetting?.value || "https://lock.dreamboks.net";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
       const checkInUrl = buildPreCheckinUrl({
         baseUrl,
         hotelSlug: hotelSlugSetting?.value,
@@ -349,8 +350,8 @@ export class ReservationStateMachine {
       const hotelNameSetting = await this.storage.getSetting("hotel_name");
       const appUrlSetting = await this.storage.getSetting("app_base_url");
 
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
-      const baseUrl = appUrlSetting?.value || "https://lock.dreamboks.net";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
       const hotelSlug = (await this.storage.getSetting("hotel_slug"))?.value;
 
       const timezoneSetting = await this.storage.getSetting("timezone");
@@ -416,7 +417,7 @@ export class ReservationStateMachine {
       const testPhoneSetting = await this.storage.getSetting("boarding_test_phone");
       const hotelNameSetting = await this.storage.getSetting("hotel_name");
 
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
       const guestEmail = testEmailSetting?.value || reservation.personalEmail || reservation.email;
       const guestMobile = testPhoneSetting?.value || reservation.mobile;
       const guestName = `${reservation.firstName} ${reservation.lastName}`;
@@ -1718,7 +1719,7 @@ export class ReservationStateMachine {
     try {
       const slug = (await this.storage.getSetting("hotel_slug"))?.value;
       if (slug) {
-        const base = ((await this.storage.getSetting("app_base_url"))?.value || "https://lock.dreamboks.net").replace(/\/+$/, "");
+        const base = ((await this.storage.getSetting("app_base_url"))?.value || config.appBaseUrl).replace(/\/+$/, "");
         emailBody = `${emailBody}\n\nSleeping in? Buy late check-out from your phone: ${base}/${slug}/extend`;
       }
     } catch { /* the link line is optional */ }

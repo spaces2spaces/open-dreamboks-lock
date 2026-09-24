@@ -84,7 +84,7 @@ describe("early_checkin_offer audience", () => {
     expect(result.ok).toBe(true);
     expect(result.recipients!.map(r => r.reservationId)).toEqual(["ok"]);
     // The link opens ONLY this campaign's offer (owner 5/8): &offer=ec.
-    expect(result.recipients![0].body).toContain("https://lock.dreamboks.net/hotel-capsule-inn/extras?code=1234&offer=ec");
+    expect(result.recipients![0].body).toContain("https://lock.example.com/hotel-capsule-inn/extras?code=1234&offer=ec");
     expect(result.recipients![0].body).toContain("Anna");
     expect(smsSpy).not.toHaveBeenCalled();
     expect(storage._marketingSends.filter(m => m.reservationId === "ok")).toHaveLength(0);
@@ -115,7 +115,7 @@ describe("late_checkout_offer audience", () => {
     expect(result.recipients!.map(r => r.reservationId).sort()).toEqual(["not-arrived", "ok"]);
     // The LC link must carry the guest's door code, exactly like early check-in
     // — and open ONLY the late-checkout offer.
-    expect(result.recipients![0].body).toContain("https://lock.dreamboks.net/hotel-capsule-inn/extras?code=1234&offer=lc");
+    expect(result.recipients![0].body).toContain("https://lock.example.com/hotel-capsule-inn/extras?code=1234&offer=lc");
     // The default text is the evening offer — times but no prices (the guest
     // sees prices on the extras page).
     expect(result.recipients![0].body).toContain("Sleep longer tomorrow?");
@@ -125,11 +125,11 @@ describe("late_checkout_offer audience", () => {
 
   it("uses the short /e/<code> link on a hotel's own domain and fits ONE SMS segment", async () => {
     vi.setSystemTime(new Date("2026-07-27T17:05:00.000Z")); // 19:05 local
-    const storage = makeWorld({ app_base_url: "https://my.hotelcapsuleinn.com" });
+    const storage = makeWorld({ app_base_url: "https://my.example-hotel.com" });
     storage._reservations.push(guest({ id: "ok", status: "Checked-in", departure: new Date("2026-07-28T08:00:00Z") }));
     const result = await runCampaign(storage as any, "late_checkout_offer", { dryRun: true });
     // ?o=lc: the /e redirect passes the offer scope through to the extras page.
-    expect(result.recipients![0].body).toContain("https://my.hotelcapsuleinn.com/e/1234?o=lc");
+    expect(result.recipients![0].body).toContain("https://my.example-hotel.com/e/1234?o=lc");
     expect(result.recipients![0].body).not.toContain("extras?code=");
     expect(result.recipients![0].body.length).toBeLessThanOrEqual(160);
   });

@@ -67,7 +67,7 @@ describe("createPaymentRequestHandlingMissingEmail", () => {
     });
     const out = await createPaymentRequestHandlingMissingEmail(mews, storage, res, "cust-1", undefined, create);
     expect(out).toEqual({ ok: true, value: { Id: "pr-4" } });
-    expect(mews.updateCustomerEmail).toHaveBeenCalledWith("cust-1", "guest-res-1@guest.dreamboks.net");
+    expect(mews.updateCustomerEmail).toHaveBeenCalledWith("cust-1", "guest-res-1@guest.example.com");
     expect(updates).toEqual([]); // placeholders never touch our reservation data
     expect(res.personalEmail).toBeNull();
   });
@@ -80,7 +80,7 @@ describe("createPaymentRequestHandlingMissingEmail", () => {
     });
     const out = await createPaymentRequestHandlingMissingEmail(mews, storage, res, "cust-1", "not-an-email", create);
     expect(out).toEqual({ ok: true, value: { Id: "pr-5" } });
-    expect(mews.updateCustomerEmail).toHaveBeenCalledWith("cust-1", "guest-res-1@guest.dreamboks.net");
+    expect(mews.updateCustomerEmail).toHaveBeenCalledWith("cust-1", "guest-res-1@guest.example.com");
     expect(updates).toEqual([]);
   });
 

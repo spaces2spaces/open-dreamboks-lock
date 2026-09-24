@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { config } from "../config";
 import type { RouteContext } from "./index";
 import { getTenantStorage, getTenantStorageAsync, verifyHotelToken, publicLimiter, resolveTenantId } from "./middleware";
 import { CheckInService } from "../checkin-service";
@@ -487,7 +488,7 @@ export function registerCheckinRoutes(app: Express, ctx: RouteContext) {
 
       const hotelSlug = hotelSlugSetting?.value || "default";
       const hotelName = hotelNameSetting?.value || "DreamBoks";
-      const appBaseUrl = appBaseUrlSetting?.value || "https://lock.dreamboks.net";
+      const appBaseUrl = appBaseUrlSetting?.value || config.appBaseUrl;
 
       // Ensure a unique pre-checkin token exists for this reservation
       let preCheckinToken = reservation.preCheckinToken;
@@ -602,7 +603,7 @@ export function registerCheckinRoutes(app: Express, ctx: RouteContext) {
       const appBaseUrlSetting = await storage.getSetting("app_base_url");
 
       const hotelName = hotelNameSetting?.value || "DreamBoks";
-      const appBaseUrl = appBaseUrlSetting?.value || "https://lock.dreamboks.net";
+      const appBaseUrl = appBaseUrlSetting?.value || config.appBaseUrl;
 
       // Ensure a pre-checkin token exists (find-by-name link ignores it, but the
       // no-slug fallback to /check-in/<token> needs it) — mirrors the email endpoint.
@@ -714,7 +715,7 @@ export function registerCheckinRoutes(app: Express, ctx: RouteContext) {
 
       const hotelSlug = hotelSlugSetting?.value || "default";
       const hotelName = hotelNameSetting?.value || "DreamBoks";
-      const appBaseUrl = appBaseUrlSetting?.value || "https://lock.dreamboks.net";
+      const appBaseUrl = appBaseUrlSetting?.value || config.appBaseUrl;
 
       // Initialize notification client
       const twilioAccountSid = await storage.getSetting("twilio_account_sid");
@@ -962,7 +963,7 @@ export function registerCheckinRoutes(app: Express, ctx: RouteContext) {
       const appBaseUrlSetting = await storage.getSetting("app_base_url");
       const hotelSlug = hotelSlugSetting?.value || "default";
       const hotelName = hotelNameSetting?.value || "DreamBoks";
-      const appBaseUrl = appBaseUrlSetting?.value || "https://lock.dreamboks.net";
+      const appBaseUrl = appBaseUrlSetting?.value || config.appBaseUrl;
 
       const resIdentifier = reservation.extId || reservation.confirmationCode;
       const boardingPassUrl = buildBoardingPassUrl(appBaseUrl, reservation, hotelSlugSetting?.value);

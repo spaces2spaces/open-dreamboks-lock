@@ -1,4 +1,5 @@
 import { IStorage } from "./storage";
+import { config } from "./config";
 import { appendHotelSlug, buildBoardingPassUrl } from "@shared/boarding-pass-url";
 import { MewsClient } from "./mews-client";
 import { AutomationEngine } from "./automation";
@@ -567,10 +568,9 @@ export class CheckInService {
 
           if (notifClient.isTwilioConfigured()) {
             const appUrlSetting = await this.storage.getSetting("app_base_url");
-            const baseUrl = appUrlSetting?.value
-              || (process.env.REPLIT_DEPLOYMENT_DOMAIN ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}` : "https://dreamboks.com");
+            const baseUrl = appUrlSetting?.value || config.appBaseUrl;
             const hotelNameSetting = await this.storage.getSetting("hotel_name");
-            const hotelNameVal = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
+            const hotelNameVal = hotelNameSetting?.value || config.defaultHotelName;
             const hotelSlug = (await this.storage.getSetting("hotel_slug"))?.value;
             const boardingPassUrl = buildBoardingPassUrl(baseUrl, freshReservation, hotelSlug);
 
@@ -685,11 +685,7 @@ export class CheckInService {
       const notificationClient = await createNotificationClient(this.storage);
 
       const appUrlSetting = await this.storage.getSetting("app_base_url");
-      const baseUrl = appUrlSetting?.value
-        ? appUrlSetting.value
-        : process.env.REPLIT_DEPLOYMENT_DOMAIN
-        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
-        : "https://dreamboks.com";
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
 
       const testEmailSetting = await this.storage.getSetting("boarding_test_email");
       const recipientEmail = testEmailSetting?.value || reservation.personalEmail || reservation.email!;

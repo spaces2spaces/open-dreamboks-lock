@@ -17,6 +17,7 @@
  * critical events go through ops-alert.
  */
 import { DateTime } from "luxon";
+import { config } from "./config";
 import { randomBytes } from "crypto";
 import type { ITenantStorage } from "./storage";
 import type { Reservation, Pin, HourlyBooking } from "@shared/schema";
@@ -766,7 +767,7 @@ export async function getOrCreateArrivalsShareToken(storage: ITenantStorage): Pr
  * Base overridable per tenant via `admin_base_url`.
  */
 export async function resolveArrivalsUrl(storage: ITenantStorage, date?: string): Promise<string> {
-  const base = ((await storage.getSetting("admin_base_url"))?.value || "https://lock.dreamboks.net").replace(/\/+$/, "");
+  const base = ((await storage.getSetting("admin_base_url"))?.value || config.appBaseUrl).replace(/\/+$/, "");
   const token = await getOrCreateArrivalsShareToken(storage);
   return `${base}/arrivals/t/${token}${date ? `?date=${date}` : ""}`;
 }

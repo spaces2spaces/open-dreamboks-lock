@@ -39,8 +39,8 @@ describe("arrivals share token", () => {
 
     const url = await resolveArrivalsUrl(storage as any, "2026-07-24");
 
-    expect(url).toMatch(/^https:\/\/lock\.dreamboks\.net\/arrivals\/t\/[a-f0-9]{64}\?date=2026-07-24$/);
+    expect(url).toMatch(/^https:\/\/lock\.example\.com\/arrivals\/t\/[a-f0-9]{64}\?date=2026-07-24$/);
     const bare = await resolveArrivalsUrl(storage as any);
-    expect(bare).toMatch(/^https:\/\/lock\.dreamboks\.net\/arrivals\/t\/[a-f0-9]{64}$/);
+    expect(bare).toMatch(/^https:\/\/lock\.example\.com\/arrivals\/t\/[a-f0-9]{64}$/);
   });
 });

@@ -1,4 +1,5 @@
 import { ITenantStorage } from "./storage";
+import { config } from "./config";
 import { AutomationEngine } from "./automation";
 import { CheckInService } from "./checkin-service";
 import { NotificationClient, NotificationChannel, createNotificationClient } from "./notification-client";
@@ -90,17 +91,13 @@ export class AutoCheckinScheduler {
       const notificationClient = await createNotificationClient(this.storage);
 
       const appUrlSetting = await this.storage.getSetting("app_base_url");
-      const baseUrl = appUrlSetting?.value
-        ? appUrlSetting.value
-        : process.env.REPLIT_DEPLOYMENT_DOMAIN
-        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
-        : "https://dreamboks.com";
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
 
       const testEmailSetting = await this.storage.getSetting("boarding_test_email");
       const testPhoneSetting = await this.storage.getSetting("boarding_test_phone");
       const hotelSlugSetting = await this.storage.getSetting("hotel_slug");
       const hotelNameSetting = await this.storage.getSetting("hotel_name");
-      const hotelName = hotelNameSetting?.value || "Copenhagen Downtown Hostel";
+      const hotelName = hotelNameSetting?.value || config.defaultHotelName;
       const requireIdSetting = await this.storage.getSetting("require_id_for_checkin");
       const requireIdForCheckin = requireIdSetting?.value === "true";
 
@@ -442,14 +439,11 @@ export class AutoCheckinScheduler {
       const notificationClient = await createNotificationClient(this.storage);
 
       const appUrlSetting = await this.storage.getSetting("app_base_url");
-      const baseUrl = appUrlSetting?.value
-        ? appUrlSetting.value
-        : process.env.REPLIT_DEPLOYMENT_DOMAIN
-        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
-        : "https://dreamboks.com";
+      const baseUrl = appUrlSetting?.value || config.appBaseUrl;
 
       const testEmailSetting = await this.storage.getSetting("boarding_test_email");
       const hotelSlugSetting = await this.storage.getSetting("hotel_slug");
+      const hotelName = (await this.storage.getSetting("hotel_name"))?.value || config.defaultHotelName;
       const runRequireIdSetting = await this.storage.getSetting("require_id_for_checkin");
       const runRequireIdForCheckin = runRequireIdSetting?.value === "true";
 
@@ -488,7 +482,7 @@ export class AutoCheckinScheduler {
           const emailResult = await notificationClient.sendPreCheckInPlainTextEmail({
             email: recipientEmail,
             guestName,
-            hotelName: "Copenhagen Downtown Hostel",
+            hotelName,
             checkInUrl,
             arrivalDate: new Date(reservation.arrival).toLocaleDateString("en-GB", {
               weekday: "long",

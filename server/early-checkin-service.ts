@@ -13,6 +13,7 @@
  */
 
 import { Storage, db, type ITenantStorage } from "./storage";
+import { config } from "./config";
 import {
   earlyCheckins,
   reservations as reservationsTable,
@@ -121,7 +122,7 @@ export async function createPaymentRequestHandlingMissingEmail<T>(
     const candidate = [typed, reservation.personalEmail, reservation.email]
       .map((v) => (v || "").trim())
       .find((v) => EMAIL_SHAPE_RE.test(v));
-    const email = candidate ?? `guest-${reservation.id.slice(0, 8)}@guest.dreamboks.net`;
+    const email = candidate ?? `guest-${reservation.id.slice(0, 8)}@${config.guestEmailFallbackDomain}`;
     await mews.updateCustomerEmail(customerId, email);
     if (typed && EMAIL_SHAPE_RE.test(typed) && !reservation.personalEmail) {
       await storage.updateReservation(reservation.id, { personalEmail: typed });
@@ -1324,7 +1325,7 @@ export async function sendPurchaseReceipt(
   if (!receipt) return { ok: false, reason: "not_found" };
 
   const storage = Storage.forTenant(tenantId);
-  const hotelName = (await storage.getSetting("hotel_name"))?.value || "Hotel Capsule Inn";
+  const hotelName = (await storage.getSetting("hotel_name"))?.value || config.defaultHotelName;
   const tz = (await storage.getSetting("property_timezone"))?.value || "Europe/Copenhagen";
   const fmt = (iso: string) => DateTime.fromISO(iso).setZone(tz).toFormat("d MMM yyyy HH:mm");
   const kindLabel = receipt.kind === "late_checkout" ? "Late check-out" : "Early check-in";

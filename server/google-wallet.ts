@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { config } from "./config";
 
 interface GoogleWalletCredentials {
   type: string;
@@ -68,7 +69,7 @@ export class GoogleWalletService {
             hexBackgroundColor: '#cc352a',
             logo: {
               sourceUri: {
-                uri: 'https://dreamboks.com/logo.png'
+                uri: `${config.appBaseUrl}/logo.png`
               }
             },
             cardTitle: {
